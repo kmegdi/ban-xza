@@ -109,4 +109,4 @@ def check_key():
     return Response(json.dumps({"status": "valid", "key_status": VALID_API_KEYS.get(api_key, "unknown")}), mimetype="application/json")
 
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False)
+    app.run())
