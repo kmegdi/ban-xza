@@ -5,7 +5,7 @@ import json
 app = Flask(__name__)
 
 VALID_API_KEYS = {
-    "XZA": "active"
+    "XZA: "active"
 }
 
 def validate_api_key(api_key):
@@ -20,36 +20,39 @@ def validate_api_key(api_key):
     if status == "banned":
         return {"error": "API key is banned", "status_code": 403}
     
-    return {"valid": True}
+    return {"valid": True} 
 
-# ✅ جلب اسم اللاعب والمنطقة
-def get_player_info(player_id):
-    url = "https://shop2game.com/api/auth/player_id_login"
+def check_banned(player_id):
+    url = f"https://ff.garena.com/api/antihack/check_banned?lang=en&uid={player_id}"
     headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Origin": "https://shop2game.com",
-        "Referer": "https://shop2game.com/app",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "referer": "https://ff.garena.com/en/support/",
+        "x-requested-with": "B6FksShzIgjfrYImLpTsadjS86sddhFH"
     }
-    payload = {
-        "app_id": 100067,
-        "login_id": f"{player_id}",
-        "app_server_id": 0,
-    }
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            nickname = data.get('nickname', 'غير متوفر')
-            region = data.get('region', 'غير متوفر')
-            return nickname, region
-        else:
-            return "غير معروف", "غير معروف"
-    except:
-        return "غير معروف", "غير معروف"
 
-# ✅ دمج فحص الحظر + جلب الاسم والمنطقة
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json().get("data", {})
+            is_banned = data.get("is_banned", 0)
+            period = data.get("period", 0)
+
+            result = {
+                "credits": "@XZA-NJA",
+                "channel": "Have to telegram",
+                "status": "BANNED" if is_banned else "NOT BANNED",
+                "ban_period": period if is_banned else 0,
+                "uid": player_id,
+                "is_banned": bool(is_banned)
+            }
+
+            return Response(json.dumps(result), mimetype="application/json")
+        else:
+            return Response(json.dumps({"error": "Failed to fetch data from server", "status_code": 500}), mimetype="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e), "status_code": 500}), mimetype="application/json")
+
 @app.route("/bancheck", methods=["GET"])
 def bancheck():
     api_key = request.args.get("key", "")
@@ -62,47 +65,13 @@ def bancheck():
     if not player_id:
         return Response(json.dumps({"error": "Player ID is required", "status_code": 400}), mimetype="application/json")
 
-    # فحص الحظر
-    try:
-        ban_url = f"https://ff.garena.com/api/antihack/check_banned?lang=en&uid={player_id}"
-        ban_headers = {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10)",
-            "Accept": "application/json",
-            "referer": "https://ff.garena.com/en/support/",
-            "x-requested-with": "B6FksShzIgjfrYImLpTsadjS86sddhFH"
-        }
+    return check_banned(player_id)
 
-        response = requests.get(ban_url, headers=ban_headers)
-        if response.status_code != 200:
-            return Response(json.dumps({"error": "Failed to fetch ban data", "status_code": 500}), mimetype="application/json")
-
-        ban_data = response.json().get("data", {})
-        is_banned = ban_data.get("is_banned", 0)
-        period = ban_data.get("period", 0)
-    except Exception as e:
-        return Response(json.dumps({"error": str(e), "status_code": 500}), mimetype="application/json")
-
-    # جلب اسم اللاعب والمنطقة
-    nickname, region = get_player_info(player_id)
-
-    result = {
-        "uid": player_id,
-        "nickname": nickname,
-        "region": region,
-        "status": "BANNED" if is_banned else "NOT BANNED",
-        "ban_period": period if is_banned else 0,
-        "is_banned": bool(is_banned),
-        "credits": "@XZA-NJA"
-    }
-
-    return Response(json.dumps(result, ensure_ascii=False), mimetype="application/json")
-
-# ✅ فحص مفتاح الـ API
 @app.route("/check_key", methods=["GET"])
 def check_key():
     api_key = request.args.get("key", "")
-    key_validation = validate_api_key(api_key)
 
+    key_validation = validate_api_key(api_key)
     if "error" in key_validation:
         return Response(json.dumps(key_validation), mimetype="application/json")
 
